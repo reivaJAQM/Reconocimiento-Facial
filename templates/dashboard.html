@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel - Sistema de Reconocimiento Facial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="h-screen bg-neutral-900 text-white flex flex-col items-center p-8 relative overflow-hidden">
+
+    <div class="absolute inset-0 z-0 pointer-events-none">
+        <div class="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-900/20 rounded-full blur-[100px] translate-x-1/2 -translate-y-1/2"></div>
+    </div>
+
+    <div class="w-full max-w-5xl flex justify-between items-center mb-10 fade-in z-10">
+        <div>
+            <h1 class="text-3xl font-bold text-white tracking-tight">Sistema de Reconocimiento Facial</h1>
+            <p class="text-gray-400 mt-1">Bienvenido, <span class="text-blue-400 font-semibold">{{ user }}</span></p>
+        </div>
+        <a href="/logout" class="bg-neutral-800 hover:bg-red-600/90 border border-neutral-700 hover:border-red-500 px-6 py-2.5 rounded-xl font-medium transition-all duration-300 text-sm">
+            Cerrar Sesión
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-5xl z-10">
+        
+        <div class="bg-neutral-800/80 p-8 rounded-3xl border border-neutral-700/50 shadow-xl backdrop-blur-sm fade-in h-fit">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="bg-blue-500/20 text-blue-400 p-2 rounded-lg text-lg">🔐</span> 
+                Estado de Seguridad
+            </h2>
+            <div class="space-y-4">
+                <div class="bg-neutral-900/50 p-5 rounded-2xl border border-neutral-700/50">
+                    <p class="text-xs text-gray-500 font-bold tracking-wider mb-1">BIOMETRÍA FACIAL</p>
+                    {% if has_face %}
+                        <div class="flex items-center gap-2">
+                            <span class="relative flex h-3 w-3">
+                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            </span>
+                            <p class="text-lg font-bold text-emerald-400">ACTIVA Y PROTEGIDA</p>
+                        </div>
+                    {% else %}
+                        <div class="flex items-center gap-2">
+                            <span class="h-3 w-3 rounded-full bg-yellow-500"></span>
+                            <p class="text-lg font-bold text-yellow-500">PENDIENTE DE REGISTRO</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-neutral-800/80 p-8 rounded-3xl border border-neutral-700/50 shadow-xl backdrop-blur-sm fade-in">
+            <h2 class="text-xl font-bold mb-6 flex items-center gap-3">
+                <span class="bg-purple-500/20 text-purple-400 p-2 rounded-lg text-lg">📸</span> 
+                Configuración Facial
+            </h2>
+            
+            <div id="camera-placeholder" class="bg-neutral-900/50 rounded-2xl h-64 flex flex-col items-center justify-center border border-dashed border-neutral-700 mb-6">
+                <div class="text-5xl mb-3 opacity-30 grayscale">📷</div>
+                <p class="text-gray-500 text-sm font-medium">Cámara en espera</p>
+            </div>
+
+            <div id="camera-container" class="bg-black rounded-2xl overflow-hidden h-64 border border-gray-700 relative mb-6 hidden shadow-2xl">
+                <img id="dashboard-video-feed" class="w-full h-full object-cover transform scale-105">
+                <div class="absolute inset-0 border-2 border-white/10 rounded-2xl pointer-events-none"></div>
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-50">
+                    <div class="w-40 h-56 border-2 border-dashed border-white/50 rounded-3xl"></div>
+                </div>
+            </div>
+
+            <p id="instruction-text" class="text-sm text-gray-400 mb-6 text-center hidden">
+                Centra tu rostro dentro del recuadro
+            </p>
+
+            <button id="btn-activate" onclick="activarCamara()" class="w-full py-3.5 bg-neutral-700 hover:bg-neutral-600 rounded-xl font-bold text-white shadow-lg transition-all border border-neutral-600">
+                {% if has_face %} 🔄 Actualizar Rostro {% else %} ➕ Registrar mi Rostro {% endif %}
+            </button>
+
+            <button id="btn-save" onclick="registrarRostro()" class="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-xl font-bold text-white shadow-lg transition-all transform active:scale-95 hidden">
+                💾 GUARDAR AHORA
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function activarCamara() {
+            document.getElementById('camera-placeholder').classList.add('hidden');
+            document.getElementById('btn-activate').classList.add('hidden');
+            
+            document.getElementById('camera-container').classList.remove('hidden');
+            document.getElementById('instruction-text').classList.remove('hidden');
+            document.getElementById('btn-save').classList.remove('hidden');
+            
+            document.getElementById('dashboard-video-feed').src = "/video_feed";
+        }
+
+        async function registrarRostro() {
+            const btn = document.getElementById('btn-save');
+            const originalText = btn.innerText;
+            btn.innerText = "Procesando...";
+            btn.disabled = true;
+            btn.classList.add("opacity-70");
+
+            try {
+                const res = await fetch('/api/registrar_rostro', { method: 'POST' });
+                const data = await res.json();
+                
+                if(data.status === 'success') {
+                    alert("✅ " + data.msg);
+                    location.reload(); 
+                } else {
+                    alert("⚠️ " + data.msg);
+                    btn.innerText = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove("opacity-70");
+                }
+            } catch (error) {
+                alert("❌ Error de conexión");
+                btn.innerText = originalText;
+                btn.disabled = false;
+                btn.classList.remove("opacity-70");
+            }
+        }
+    </script>
+</body>
+</html>

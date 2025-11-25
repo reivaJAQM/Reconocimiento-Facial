@@ -3,173 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BioAccess Security</title>
-    
-    <!-- 1. Cargamos Tailwind CSS (Librería de diseño) -->
+    <title>Sistema de Reconocimiento Facial</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- 2. Cargamos NUESTRO CSS personalizado -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="h-screen flex items-center justify-center">
+<body class="h-screen flex items-center justify-center relative overflow-hidden bg-neutral-900">
 
-    <!-- VISTA 1: BIENVENIDA -->
-    <div id="view-welcome" class="text-center fade-in">
-        <div class="text-9xl mb-6">🛡️</div>
-        
-        <h1 class="text-4xl font-bold mb-10 text-gray-100 tracking-wide">BioAccess Security</h1>
-        
-        <div class="space-y-4">
-            <button onclick="showRegister()" class="w-80 py-4 bg-slate-700 hover:bg-slate-600 rounded-full text-xl font-bold text-white shadow-lg transition-transform active:scale-95 border border-slate-600">
-                Crear Nueva Cuenta
-            </button>
-            <br>
-            <button onclick="showLogin()" class="w-80 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full text-xl font-bold text-white shadow-lg transition-transform active:scale-95 border border-emerald-500">
-                Acceder al Sistema
-            </button>
-        </div>
+    <div class="absolute inset-0 z-0">
+        <div class="absolute top-0 left-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2"></div>
+        <div class="absolute bottom-0 right-0 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl translate-x-1/2 translate-y-1/2"></div>
     </div>
 
-    <!-- VISTA 2: REGISTRO (AHORA CON ID Y CONTRASEÑA, SIN CÁMARA) -->
-    <div id="view-register" class="bg-neutral-800 p-8 rounded-2xl card-shadow w-[450px] text-center hidden fade-in border border-neutral-700">
-        <h2 class="text-2xl font-bold mb-2 text-white">Crear Cuenta</h2>
-        <p class="text-gray-400 mb-6 text-sm uppercase tracking-wider">Registro de Credenciales</p>
-
-        <!-- Input: Identificación -->
-        <div class="text-left mb-4">
-            <label class="text-xs text-gray-500 font-bold ml-1">IDENTIFICACIÓN</label>
-            <input type="text" id="reg-id" placeholder="Ej: 1312345678" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-colors">
+    <div id="view-main" class="bg-neutral-800/90 p-10 rounded-3xl card-shadow w-[480px] text-center fade-in border border-neutral-700 z-10 relative">
+        <div class="text-6xl mb-6">👤</div>
+        <h1 class="text-3xl font-bold mb-8 text-white tracking-tight">Sistema de<br>Reconocimiento Facial</h1>
+        
+        <div class="text-left mb-5">
+            <label class="text-xs text-gray-400 font-bold ml-1 tracking-wider">IDENTIFICACIÓN</label>
+            <input type="text" id="login-id" placeholder="Ingrese su cédula" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3.5 text-white mt-1 focus:outline-none focus:border-blue-500 transition-all">
         </div>
-
-        <!-- Input: Contraseña -->
         <div class="text-left mb-8">
-            <label class="text-xs text-gray-500 font-bold ml-1">CONTRASEÑA</label>
-            <input type="password" id="reg-pass" placeholder="••••••••" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-colors">
+            <label class="text-xs text-gray-400 font-bold ml-1 tracking-wider">CONTRASEÑA</label>
+            <input type="password" id="login-pass" placeholder="••••••••" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3.5 text-white mt-1 focus:outline-none focus:border-blue-500 transition-all">
         </div>
-
-        <!-- Botón Guardar -->
-        <button onclick="doRegister()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-full text-lg font-bold text-white mb-4 transition-colors shadow-md">
-            GUARDAR USUARIO
+        
+        <button onclick="doLoginStep1()" class="w-full py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 rounded-xl text-lg font-bold text-white mb-6 shadow-lg transform transition hover:-translate-y-1">
+            INICIAR SESIÓN
         </button>
 
-        <button onclick="showWelcome()" class="text-gray-500 hover:text-white text-sm transition-colors">Cancelar</button>
+        <div class="border-t border-gray-700 pt-6">
+            <button onclick="showRegister()" class="text-gray-400 hover:text-white text-sm transition-colors">
+                ¿No tienes cuenta? <span class="text-blue-400 font-bold">Regístrate aquí</span>
+            </button>
+        </div>
     </div>
 
-    <!-- VISTA 3: LOGIN (SIGUE USANDO CÁMARA PARA USUARIOS ANTIGUOS) -->
-    <div id="view-login" class="bg-neutral-800 p-8 rounded-2xl card-shadow w-[500px] text-center hidden fade-in border border-neutral-700">
-        <h2 class="text-2xl font-bold mb-2 text-white">Acceso al Sistema</h2>
-        <p class="text-gray-400 mb-6 text-sm uppercase tracking-wider">Escáner biométrico activo</p>
+    <div id="view-register" class="bg-neutral-800/90 p-10 rounded-3xl card-shadow w-[480px] text-center hidden fade-in border border-neutral-700 z-10 relative">
+        <h2 class="text-2xl font-bold mb-2 text-white">Crear Nueva Cuenta</h2>
+        <p class="text-gray-400 mb-8 text-sm">Ingrese sus datos personales</p>
 
-        <div class="bg-black rounded-lg overflow-hidden mb-6 h-64 border border-gray-700 relative flex justify-center items-center">
-            <!-- La imagen se carga desde Python (Video Streaming) -->
-            <img id="video-feed-log" class="h-full w-full object-cover opacity-90">
-            <!-- Marco decorativo animado -->
-            <div class="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none z-10"></div>
-            <!-- Línea de escaneo -->
-            <div class="absolute inset-x-0 h-1 bg-emerald-500/50 top-0 animate-scan pointer-events-none z-0"></div>
+        <div class="text-left mb-4">
+            <label class="text-xs text-gray-400 font-bold ml-1 tracking-wider">IDENTIFICACIÓN</label>
+            <input type="text" id="reg-id" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-all">
         </div>
 
-        <div id="login-status" class="text-xl font-bold mb-6 text-gray-400 animate-pulse">🔍 Buscando rostro...</div>
+        <div class="flex gap-4 mb-4">
+            <div class="w-1/2 text-left">
+                <label class="text-xs text-gray-400 font-bold ml-1 tracking-wider">NOMBRE</label>
+                <input type="text" id="reg-nombre" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-all">
+            </div>
+            <div class="w-1/2 text-left">
+                <label class="text-xs text-gray-400 font-bold ml-1 tracking-wider">APELLIDO</label>
+                <input type="text" id="reg-apellido" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-all">
+            </div>
+        </div>
 
-        <button onclick="showWelcome()" class="text-gray-500 hover:text-white text-sm transition-colors" id="btn-back-login">Cancelar</button>
+        <div class="text-left mb-8">
+            <label class="text-xs text-gray-400 font-bold ml-1 tracking-wider">CONTRASEÑA</label>
+            <input type="password" id="reg-pass" class="w-full bg-black/50 border border-gray-600 rounded-xl px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-all">
+        </div>
+
+        <button onclick="doRegister()" class="w-full py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 rounded-xl text-lg font-bold text-white mb-4 shadow-lg transform transition hover:-translate-y-1">
+            GUARDAR REGISTRO
+        </button>
+        <button onclick="showMain()" class="text-gray-500 hover:text-white text-sm font-medium">Cancelar y volver</button>
     </div>
 
-    <!-- JAVASCRIPT -->
-    <script>
-        let loginInterval;
-
-        // Función para ocultar todas las vistas
-        function hideAll() {
-            document.getElementById('view-welcome').classList.add('hidden');
-            document.getElementById('view-register').classList.add('hidden');
-            document.getElementById('view-login').classList.add('hidden');
+    <div id="view-2fa" class="fixed inset-0 bg-black/95 hidden flex items-center justify-center z-50 fade-in backdrop-blur-sm">
+        <div class="bg-neutral-900 p-8 rounded-3xl border border-blue-500/30 w-[500px] text-center shadow-2xl">
+            <h2 class="text-2xl font-bold mb-2 text-white">Validación Biométrica</h2>
+            <p class="text-gray-400 mb-6">El sistema requiere verificar su identidad</p>
             
-            // Apagamos la transmisión de video del login
-            document.getElementById('video-feed-log').src = "";
-            clearInterval(loginInterval);
+            <div class="bg-black rounded-2xl overflow-hidden mb-6 h-64 border border-gray-800 relative flex justify-center items-center shadow-inner">
+                <img id="video-feed-2fa" class="h-full w-full object-cover opacity-90">
+                
+                <div class="absolute inset-0 border-2 border-blue-500/50 rounded-2xl animate-pulse"></div>
+            </div>
+
+            <div id="2fa-status" class="text-xl font-bold mb-8 text-blue-400 animate-pulse tracking-wide">🔍 Escaneando rostro...</div>
+            
+            <button onclick="cancel2FA()" class="text-red-500 hover:text-red-400 text-sm font-bold tracking-widest uppercase">Cancelar Ingreso</button>
+        </div>
+    </div>
+
+    <script>
+        let checkInterval;
+
+        function hideAll() {
+            document.getElementById('view-main').classList.add('hidden');
+            document.getElementById('view-register').classList.add('hidden');
+            document.getElementById('view-2fa').classList.add('hidden');
+            document.getElementById('video-feed-2fa').src = "";
+            clearInterval(checkInterval);
         }
 
-        // Mostrar Bienvenida
-        function showWelcome() {
-            hideAll();
-            document.getElementById('view-welcome').classList.remove('hidden');
-        }
+        function showMain() { hideAll(); document.getElementById('view-main').classList.remove('hidden'); }
+        function showRegister() { hideAll(); document.getElementById('view-register').classList.remove('hidden'); }
 
-        // Mostrar Registro (AHORA SIN CÁMARA)
-        function showRegister() {
-            hideAll();
-            document.getElementById('view-register').classList.remove('hidden');
-            // Nota: Ya no activamos ningún video aquí
-        }
-
-        // Mostrar Login (CON CÁMARA)
-        function showLogin() {
-            hideAll();
-            document.getElementById('view-login').classList.remove('hidden');
-            // Activamos la cámara solo aquí
-            document.getElementById('video-feed-log').src = "/video_feed";
-            startLoginCheck();
-        }
-
-        // Lógica de Registro (Envía ID y Password)
         async function doRegister() {
-            const userId = document.getElementById('reg-id').value;
-            const userPass = document.getElementById('reg-pass').value;
+            const id = document.getElementById('reg-id').value;
+            const nombre = document.getElementById('reg-nombre').value;
+            const apellido = document.getElementById('reg-apellido').value;
+            const pass = document.getElementById('reg-pass').value;
 
-            if(!userId || !userPass) { 
-                alert("⚠️ Por favor completa todos los campos"); 
-                return; 
-            }
+            if(!id || !pass || !nombre || !apellido) return alert("⚠️ Por favor complete todos los campos");
 
             const res = await fetch('/api/registro', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    id: userId,
-                    password: userPass
-                })
+                body: JSON.stringify({ id, nombre, apellido, password: pass })
             });
             const data = await res.json();
             
             if(data.status === 'success') {
                 alert("✅ " + data.msg);
-                showWelcome();
-                // Limpiar campos
-                document.getElementById('reg-id').value = "";
-                document.getElementById('reg-pass').value = "";
+                showMain();
+                document.getElementById('login-id').value = id;
             } else {
                 alert("❌ " + data.msg);
             }
         }
 
-        // Lógica de Login Facial (Consulta automática al servidor)
-        function startLoginCheck() {
-            const statusLabel = document.getElementById('login-status');
-            const btnBack = document.getElementById('btn-back-login');
-            
-            statusLabel.innerText = "🔍 Buscando rostro...";
-            statusLabel.className = "text-xl font-bold mb-6 text-gray-400 animate-pulse";
-            btnBack.innerText = "Cancelar";
-            btnBack.className = "text-gray-500 hover:text-white text-sm transition-colors";
+        async function doLoginStep1() {
+            const id = document.getElementById('login-id').value;
+            const pass = document.getElementById('login-pass').value;
+            if(!id || !pass) return alert("Ingrese sus credenciales");
 
-            loginInterval = setInterval(async () => {
+            const res = await fetch('/api/login_step1', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ id, password: pass })
+            });
+            const data = await res.json();
+
+            if(data.status === 'success') window.location.href = "/dashboard";
+            else if (data.status === 'partial') start2FA();
+            else alert("⛔ " + data.msg);
+        }
+
+        // --- LÓGICA DE VALIDACIÓN FACIAL ---
+        function start2FA() {
+            document.getElementById('view-2fa').classList.remove('hidden');
+            document.getElementById('video-feed-2fa').src = "/video_feed";
+            
+            // Reiniciamos textos por si acaso
+            const statusLabel = document.getElementById('2fa-status');
+            statusLabel.innerText = "🔍 Escaneando rostro...";
+            statusLabel.className = "text-xl font-bold mb-8 text-blue-400 animate-pulse tracking-wide";
+
+            checkInterval = setInterval(async () => {
                 try {
-                    const res = await fetch('/api/login', {method: 'POST'});
+                    const res = await fetch('/api/login_step2_face', {method: 'POST'});
                     const data = await res.json();
                     
                     if(data.status === 'success') {
-                        statusLabel.innerText = "🔓 BIENVENIDO: " + data.msg.toUpperCase();
-                        statusLabel.className = "text-2xl font-bold mb-6 text-emerald-500 scale-105 transition-transform";
+                        // 1. ROSTRO DETECTADO: Detenemos la búsqueda en la API
+                        clearInterval(checkInterval);
+
+                        // 2. INICIAMOS CUENTA REGRESIVA (3 Segundos)
+                        // NOTA: No apagamos el video (video-feed-2fa) para que el usuario se siga viendo.
+                        let segundos = 3;
                         
-                        clearInterval(loginInterval);
-                        document.getElementById('video-feed-log').src = ""; // Congelar imagen
-                        
-                        btnBack.innerText = "Cerrar Sesión";
-                        btnBack.className = "w-full py-3 bg-red-600 hover:bg-red-500 rounded-full text-lg font-bold text-white mb-4 shadow-lg";
+                        statusLabel.className = "text-2xl font-bold mb-8 text-emerald-400";
+                        statusLabel.innerText = `✅ IDENTIDAD CONFIRMADA. Ingresando en ${segundos}...`;
+
+                        const cuentaRegresiva = setInterval(() => {
+                            segundos--;
+                            statusLabel.innerText = `✅ IDENTIDAD CONFIRMADA. Ingresando en ${segundos}...`;
+
+                            if (segundos <= 0) {
+                                clearInterval(cuentaRegresiva);
+                                window.location.href = "/dashboard";
+                            }
+                        }, 1000);
                     }
-                } catch(e) { console.log("..."); }
-            }, 1000);
+                } catch(e) {}
+            }, 800);
         }
+
+        function cancel2FA() { location.reload(); }
     </script>
 </body>
 </html>

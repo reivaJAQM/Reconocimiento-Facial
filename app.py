@@ -1,22 +1,21 @@
-from flask import Flask, render_template, Response, request, jsonify
+from flask import Flask, render_template, Response, request, jsonify, session, redirect, url_for
 import cv2
 import face_recognition
 import numpy as np
 import os
 import json
 import base64
-import atexit # Para cerrar la cámara correctamente al salir
+import atexit
 
 app = Flask(__name__)
+app.secret_key = 'super_secreta_clave_flask'
 
 # --- CONFIGURACIÓN ---
 DB_FILE = "usuarios_db.json"
-camera = None # No la iniciamos globalmente todavía
-
-# Variables Globales
+camera = None 
 current_face_encoding = None
 
-# --- FUNCIONES BD ---
+# --- FUNCIONES ---
 def cargar_db():
     if not os.path.exists(DB_FILE): return {}
     try:
@@ -32,12 +31,11 @@ def array_a_base64(np_array):
 def base64_a_array(b64_str):
     return np.frombuffer(base64.b64decode(b64_str), dtype=np.float64)
 
-# --- GESTIÓN INTELIGENTE DE CÁMARA ---
+# --- CÁMARA ---
 def get_camera():
     global camera
     if camera is None or not camera.isOpened():
-        # Intentamos abrir la cámara con backend DSHOW (más compatible en Windows)
-        camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        camera = cv2.VideoCapture(0, cv2.CAP_DSHOW) 
     return camera
 
 def release_camera():
@@ -46,99 +44,135 @@ def release_camera():
         camera.release()
         camera = None
 
-# Aseguramos que la cámara se apague si el servidor se cae
 atexit.register(release_camera)
 
-# --- GENERADOR DE VIDEO ---
 def generar_frames():
     global current_face_encoding
-    cam = get_camera() # Obtenemos la cámara aquí, bajo demanda
-    
+    cam = get_camera()
     while True:
         success, frame = cam.read()
-        if not success:
-            # Si falla, intentamos reiniciarla una vez
-            cam.release()
-            cam = get_camera()
-            success, frame = cam.read()
-            if not success:
-                break
-        
-        # 1. Procesamiento
+        if not success: break
         frame = cv2.flip(frame, 1)
-        
-        # 2. Detección (Optimizada)
         small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-        rgb_small_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
-        face_locations = face_recognition.face_locations(rgb_small_frame)
-        face_locations = [(t*4, r*4, b*4, l*4) for (t, r, b, l) in face_locations]
-
+        rgb_small = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+        locs = face_recognition.face_locations(rgb_small)
         current_face_encoding = None
-        
-        if face_locations:
-            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            encodings = face_recognition.face_encodings(rgb_frame, face_locations)
-            if encodings:
-                current_face_encoding = encodings[0]
-
-            for (top, right, bottom, left) in face_locations:
-                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-
-        # 3. Enviar a la web
+        if locs:
+            encs = face_recognition.face_encodings(rgb_small, locs)
+            if encs: current_face_encoding = encs[0]
+            for (t, r, b, l) in locs:
+                cv2.rectangle(frame, (l*4, t*4), (r*4, b*4), (0, 255, 0), 2)
         ret, buffer = cv2.imencode('.jpg', frame)
-        frame_bytes = buffer.tobytes()
-        
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+        yield (b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
 
 # --- RUTAS ---
 @app.route('/')
 def index():
+    if 'user_id' in session: return redirect(url_for('dashboard'))
     return render_template('index.html')
+
+@app.route('/dashboard')
+def dashboard():
+    if 'user_id' not in session: return redirect(url_for('index'))
+    user_id = session['user_id']
+    db = cargar_db()
+    
+    # Construimos el nombre completo uniendo Nombre + Apellido
+    user_data = db.get(user_id, {})
+    nombre = user_data.get('nombre', '')
+    apellido = user_data.get('apellido', '')
+    nombre_completo = f"{nombre} {apellido}".strip()
+    
+    # Si por alguna razón están vacíos, mostramos el ID
+    if not nombre_completo: nombre_completo = user_id
+    
+    tiene_rostro = True if user_data.get('face_encoding') else False
+        
+    return render_template('dashboard.html', user=nombre_completo, has_face=tiene_rostro)
 
 @app.route('/video_feed')
 def video_feed():
     return Response(generar_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
+# --- APIS ---
 @app.route('/api/registro', methods=['POST'])
 def registro():
     data = request.json
-    user_id = data.get('id')       # Número de identificación
-    password = data.get('password') # Contraseña
+    user_id = data.get('id')
+    nombre = data.get('nombre')    # Nuevo campo
+    apellido = data.get('apellido') # Nuevo campo
+    password = data.get('password')
     
-    # Validaciones básicas
-    if not user_id or not password: 
-        return jsonify({"status": "error", "msg": "Faltan datos (ID o Contraseña)"})
+    if not user_id or not password or not nombre or not apellido: 
+        return jsonify({"status": "error", "msg": "Faltan datos (Llene todos los campos)"})
     
     db = cargar_db()
+    if user_id in db: return jsonify({"status": "error", "msg": "Usuario ya existe"})
     
-    # Verificar si el ID ya existe
-    if user_id in db: 
-        return jsonify({"status": "error", "msg": "Este número de identificación ya está registrado"})
-    
-    # GUARDAR DATOS (Texto plano por ahora, en prod usaríamos Hashing como bcrypt)
-    # Estructura: ID -> {password, fecha_creacion, etc}
+    # Guardamos por separado
     db[user_id] = {
-        "password": password,
-        "face_encoding": None # Dejamos el espacio listo para agregar la cara después
+        "nombre": nombre,
+        "apellido": apellido,
+        "password": password, 
+        "face_encoding": None
     }
-    
     guardar_db(db)
-    return jsonify({"status": "success", "msg": f"Usuario {user_id} creado correctamente"})
+    return jsonify({"status": "success", "msg": "Usuario creado correctamente"})
 
-@app.route('/api/login', methods=['POST'])
-def login():
+@app.route('/api/login_step1', methods=['POST'])
+def login_step1():
+    data = request.json
+    user_id = data.get('id')
+    password = data.get('password')
+    db = cargar_db()
+    
+    if user_id in db and db[user_id]['password'] == password:
+        # Recuperamos datos para saludar
+        user_data = db[user_id]
+        n = user_data.get('nombre', '')
+        a = user_data.get('apellido', '')
+        nombre_real = f"{n} {a}".strip() or user_id
+        
+        if db[user_id].get('face_encoding'):
+            session['pre_login_id'] = user_id
+            return jsonify({"status": "partial", "msg": "Validación requerida"})
+        else:
+            session['user_id'] = user_id
+            return jsonify({"status": "success", "msg": f"Bienvenido, {nombre_real}"})
+            
+    return jsonify({"status": "error", "msg": "Credenciales incorrectas"})
+
+@app.route('/api/login_step2_face', methods=['POST'])
+def login_step2_face():
     global current_face_encoding
+    if 'pre_login_id' not in session: return jsonify({"status": "error", "msg": "Sesión expirada"})
     if current_face_encoding is None: return jsonify({"status": "waiting", "msg": "Buscando..."})
     
+    target_user = session['pre_login_id']
     db = cargar_db()
-    for u, b64 in db.items():
-        saved = base64_a_array(b64)
-        if face_recognition.compare_faces([saved], current_face_encoding, tolerance=0.5)[0]:
-            return jsonify({"status": "success", "msg": u})
-            
-    return jsonify({"status": "error", "msg": "No reconocido"})
+    rostro_guardado = base64_a_array(db[target_user]['face_encoding'])
+    
+    if face_recognition.compare_faces([rostro_guardado], current_face_encoding, tolerance=0.5)[0]:
+        session['user_id'] = target_user
+        session.pop('pre_login_id', None)
+        return jsonify({"status": "success", "msg": "Identidad verificada"})
+    
+    return jsonify({"status": "waiting", "msg": "No coincide"})
+
+@app.route('/api/registrar_rostro', methods=['POST'])
+def registrar_rostro():
+    global current_face_encoding
+    if 'user_id' not in session: return jsonify({"status": "error", "msg": "Error de sesión"})
+    if current_face_encoding is None: return jsonify({"status": "error", "msg": "No se detecta rostro"})
+    db = cargar_db()
+    db[session['user_id']]['face_encoding'] = array_a_base64(current_face_encoding)
+    guardar_db(db)
+    return jsonify({"status": "success", "msg": "Rostro registrado"})
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    # TRUCO IMPORTANTE: use_reloader=False evita que la cámara se abra dos veces
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    app.run(debug=True, host='0.0.0.0', port=5000)
