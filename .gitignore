@@ -1,0 +1,20 @@
+Ignorar carpetas de entorno virtual (Pesadas e innecesarias)
+
+venv/
+env/
+.env
+
+Ignorar archivos compilados de Python
+
+pycache/
+*.pyc
+
+Ignorar base de datos local (Por seguridad, mejor no subir credenciales reales)
+
+Si quieres subirla para pruebas, pon un # al inicio de la siguiente línea
+
+usuarios_db.json
+
+Ignorar archivos de sistema
+
+.DS_Store

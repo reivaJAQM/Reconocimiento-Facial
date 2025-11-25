@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioAccess Security</title>
+    
+    <!-- 1. Cargamos Tailwind CSS (Librería de diseño) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Cargamos NUESTRO CSS personalizado -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body class="h-screen flex items-center justify-center">
+
+    <!-- VISTA 1: BIENVENIDA -->
+    <div id="view-welcome" class="text-center fade-in">
+        <div class="text-9xl mb-6">🛡️</div>
+        
+        <h1 class="text-4xl font-bold mb-10 text-gray-100 tracking-wide">BioAccess Security</h1>
+        
+        <div class="space-y-4">
+            <button onclick="showRegister()" class="w-80 py-4 bg-slate-700 hover:bg-slate-600 rounded-full text-xl font-bold text-white shadow-lg transition-transform active:scale-95 border border-slate-600">
+                Crear Nueva Cuenta
+            </button>
+            <br>
+            <button onclick="showLogin()" class="w-80 py-4 bg-emerald-600 hover:bg-emerald-500 rounded-full text-xl font-bold text-white shadow-lg transition-transform active:scale-95 border border-emerald-500">
+                Acceder al Sistema
+            </button>
+        </div>
+    </div>
+
+    <!-- VISTA 2: REGISTRO (AHORA CON ID Y CONTRASEÑA, SIN CÁMARA) -->
+    <div id="view-register" class="bg-neutral-800 p-8 rounded-2xl card-shadow w-[450px] text-center hidden fade-in border border-neutral-700">
+        <h2 class="text-2xl font-bold mb-2 text-white">Crear Cuenta</h2>
+        <p class="text-gray-400 mb-6 text-sm uppercase tracking-wider">Registro de Credenciales</p>
+
+        <!-- Input: Identificación -->
+        <div class="text-left mb-4">
+            <label class="text-xs text-gray-500 font-bold ml-1">IDENTIFICACIÓN</label>
+            <input type="text" id="reg-id" placeholder="Ej: 1312345678" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-colors">
+        </div>
+
+        <!-- Input: Contraseña -->
+        <div class="text-left mb-8">
+            <label class="text-xs text-gray-500 font-bold ml-1">CONTRASEÑA</label>
+            <input type="password" id="reg-pass" placeholder="••••••••" class="w-full bg-black border border-gray-700 rounded-lg px-4 py-3 text-white mt-1 focus:outline-none focus:border-emerald-500 transition-colors">
+        </div>
+
+        <!-- Botón Guardar -->
+        <button onclick="doRegister()" class="w-full py-3 bg-emerald-600 hover:bg-emerald-500 rounded-full text-lg font-bold text-white mb-4 transition-colors shadow-md">
+            GUARDAR USUARIO
+        </button>
+
+        <button onclick="showWelcome()" class="text-gray-500 hover:text-white text-sm transition-colors">Cancelar</button>
+    </div>
+
+    <!-- VISTA 3: LOGIN (SIGUE USANDO CÁMARA PARA USUARIOS ANTIGUOS) -->
+    <div id="view-login" class="bg-neutral-800 p-8 rounded-2xl card-shadow w-[500px] text-center hidden fade-in border border-neutral-700">
+        <h2 class="text-2xl font-bold mb-2 text-white">Acceso al Sistema</h2>
+        <p class="text-gray-400 mb-6 text-sm uppercase tracking-wider">Escáner biométrico activo</p>
+
+        <div class="bg-black rounded-lg overflow-hidden mb-6 h-64 border border-gray-700 relative flex justify-center items-center">
+            <!-- La imagen se carga desde Python (Video Streaming) -->
+            <img id="video-feed-log" class="h-full w-full object-cover opacity-90">
+            <!-- Marco decorativo animado -->
+            <div class="absolute inset-0 border-2 border-emerald-500/50 rounded-lg pointer-events-none z-10"></div>
+            <!-- Línea de escaneo -->
+            <div class="absolute inset-x-0 h-1 bg-emerald-500/50 top-0 animate-scan pointer-events-none z-0"></div>
+        </div>
+
+        <div id="login-status" class="text-xl font-bold mb-6 text-gray-400 animate-pulse">🔍 Buscando rostro...</div>
+
+        <button onclick="showWelcome()" class="text-gray-500 hover:text-white text-sm transition-colors" id="btn-back-login">Cancelar</button>
+    </div>
+
+    <!-- JAVASCRIPT -->
+    <script>
+        let loginInterval;
+
+        // Función para ocultar todas las vistas
+        function hideAll() {
+            document.getElementById('view-welcome').classList.add('hidden');
+            document.getElementById('view-register').classList.add('hidden');
+            document.getElementById('view-login').classList.add('hidden');
+            
+            // Apagamos la transmisión de video del login
+            document.getElementById('video-feed-log').src = "";
+            clearInterval(loginInterval);
+        }
+
+        // Mostrar Bienvenida
+        function showWelcome() {
+            hideAll();
+            document.getElementById('view-welcome').classList.remove('hidden');
+        }
+
+        // Mostrar Registro (AHORA SIN CÁMARA)
+        function showRegister() {
+            hideAll();
+            document.getElementById('view-register').classList.remove('hidden');
+            // Nota: Ya no activamos ningún video aquí
+        }
+
+        // Mostrar Login (CON CÁMARA)
+        function showLogin() {
+            hideAll();
+            document.getElementById('view-login').classList.remove('hidden');
+            // Activamos la cámara solo aquí
+            document.getElementById('video-feed-log').src = "/video_feed";
+            startLoginCheck();
+        }
+
+        // Lógica de Registro (Envía ID y Password)
+        async function doRegister() {
+            const userId = document.getElementById('reg-id').value;
+            const userPass = document.getElementById('reg-pass').value;
+
+            if(!userId || !userPass) { 
+                alert("⚠️ Por favor completa todos los campos"); 
+                return; 
+            }
+
+            const res = await fetch('/api/registro', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    id: userId,
+                    password: userPass
+                })
+            });
+            const data = await res.json();
+            
+            if(data.status === 'success') {
+                alert("✅ " + data.msg);
+                showWelcome();
+                // Limpiar campos
+                document.getElementById('reg-id').value = "";
+                document.getElementById('reg-pass').value = "";
+            } else {
+                alert("❌ " + data.msg);
+            }
+        }
+
+        // Lógica de Login Facial (Consulta automática al servidor)
+        function startLoginCheck() {
+            const statusLabel = document.getElementById('login-status');
+            const btnBack = document.getElementById('btn-back-login');
+            
+            statusLabel.innerText = "🔍 Buscando rostro...";
+            statusLabel.className = "text-xl font-bold mb-6 text-gray-400 animate-pulse";
+            btnBack.innerText = "Cancelar";
+            btnBack.className = "text-gray-500 hover:text-white text-sm transition-colors";
+
+            loginInterval = setInterval(async () => {
+                try {
+                    const res = await fetch('/api/login', {method: 'POST'});
+                    const data = await res.json();
+                    
+                    if(data.status === 'success') {
+                        statusLabel.innerText = "🔓 BIENVENIDO: " + data.msg.toUpperCase();
+                        statusLabel.className = "text-2xl font-bold mb-6 text-emerald-500 scale-105 transition-transform";
+                        
+                        clearInterval(loginInterval);
+                        document.getElementById('video-feed-log').src = ""; // Congelar imagen
+                        
+                        btnBack.innerText = "Cerrar Sesión";
+                        btnBack.className = "w-full py-3 bg-red-600 hover:bg-red-500 rounded-full text-lg font-bold text-white mb-4 shadow-lg";
+                    }
+                } catch(e) { console.log("..."); }
+            }, 1000);
+        }
+    </script>
+</body>
+</html>
